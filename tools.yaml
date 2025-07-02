@@ -1,0 +1,13 @@
+tools:
+  - namespace: util
+    name: echo
+    description: Echo a message
+    run:
+      cmd: echo
+      args:
+        - "{{.message}}"
+    args:
+      - name: message
+        description: message to echo
+        type: string
+        required: true
