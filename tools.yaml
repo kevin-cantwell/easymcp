@@ -1,13 +1,33 @@
 tools:
-  - namespace: util
+  - namespace: utils
     name: echo
     description: Echo a message
     run:
       cmd: echo
       args:
         - "{{.message}}"
-    args:
+    input:
       - name: message
         description: message to echo
         type: string
         required: true
+  - namespace: files
+    name: jq
+    description: Parses a json blob
+    run:
+      cmd: jq
+      args:
+        - .
+        - jq.json
+    output:
+      format: text
+  - namespace: files
+    name: img
+    description: Fetches an image
+    run:
+      cmd: cat
+      args:
+        - /Users/kcantwell/Downloads/sad_coffee.png
+    output:
+      format: image
+
