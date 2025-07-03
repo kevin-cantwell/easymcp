@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"log"
+	"sync"
 
 	"github.com/example/easymcp/internal/config"
 	"github.com/example/easymcp/internal/executor"
+	"github.com/fsnotify/fsnotify"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -19,12 +21,27 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	// Create a server with a single tool.
 	server := mcp.NewServer("easymcp", "v0.0.1", nil)
-	tools := []*mcp.ServerTool{}
 
-	// Register each tool from config
+	tools, err := buildServerTools(cfg)
+	if err != nil {
+		log.Fatalf("failed to create tools: %v", err)
+	}
+	server.AddTools(tools...)
+
+	if err := startConfigWatcher(ctx, "tools.yaml", server, tools); err != nil {
+		log.Fatalf("failed to watch config: %v", err)
+	}
+
+	if err := server.Run(ctx, mcp.NewStdioTransport()); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func buildServerTools(cfg *config.Config) ([]*mcp.ServerTool, error) {
+	tools := make([]*mcp.ServerTool, 0, len(cfg.Tools))
 	for _, t := range cfg.Tools {
+		t := t
 		name := t.Namespace + "/" + t.Name
 
 		inputOpts := []mcp.SchemaOption{}
@@ -42,7 +59,7 @@ func main() {
 
 		inSchema, err := t.InputSchema()
 		if err != nil {
-			log.Fatalf("failed to create input schema: %v", err)
+			return nil, err
 		}
 
 		tool := &mcp.ServerTool{
@@ -50,7 +67,6 @@ func main() {
 				Name:        name,
 				Description: t.Description,
 				InputSchema: inSchema,
-				// OutputSchema: oschema,
 			},
 			Handler: func(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[map[string]any]) (*mcp.CallToolResult, error) {
 				out, err := executor.RunCommand(ctx, t.Run.Cmd, t.Run.Args, params.Arguments)
@@ -62,13 +78,68 @@ func main() {
 				}, nil
 			},
 		}
-
 		tools = append(tools, tool)
 	}
+	return tools, nil
+}
 
-	server.AddTools(tools...)
-
-	if err := server.Run(ctx, mcp.NewStdioTransport()); err != nil {
-		log.Fatal(err)
+func startConfigWatcher(ctx context.Context, path string, server *mcp.Server, initial []*mcp.ServerTool) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
 	}
+	if err := watcher.Add(path); err != nil {
+		return err
+	}
+
+	var mu sync.Mutex
+	current := append([]*mcp.ServerTool(nil), initial...)
+
+	reload := func() {
+		cfg, err := config.Load(path)
+		if err != nil {
+			log.Printf("failed to reload config: %v", err)
+			return
+		}
+		tools, err := buildServerTools(cfg)
+		if err != nil {
+			log.Printf("failed to build tools: %v", err)
+			return
+		}
+		mu.Lock()
+		if len(current) > 0 {
+			names := make([]string, len(current))
+			for i, t := range current {
+				names[i] = t.Tool.Name
+			}
+			server.RemoveTools(names...)
+		}
+		server.AddTools(tools...)
+		current = tools
+		mu.Unlock()
+		log.Printf("reloaded tools from %s", path)
+	}
+
+	go func() {
+		defer watcher.Close()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) != 0 {
+					reload()
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Printf("watcher error: %v", err)
+			}
+		}
+	}()
+	return nil
 }
