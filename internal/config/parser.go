@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"unicode"
 
@@ -93,9 +94,29 @@ func (t *Tool) InputSchema() (*jsonschema.Schema, error) {
 		fields[i] = field
 
 	}
+
 	dynamicType := reflect.StructOf(fields)
-	// instanceVal := reflect.New(dynamicType).Elem()
-	return jsonschema.ForType(dynamicType)
+	schema, err := jsonschema.ForType(dynamicType)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update properties schema based on tool arguments
+	for _, arg := range t.Args {
+		prop := schema.Properties[arg.Name]
+		if prop == nil {
+			return nil, fmt.Errorf("missing schema property for argument: %s", arg.Name)
+		}
+		prop.Description = arg.Description
+		if len(arg.Enum) > 0 {
+			prop.Enum = arg.Enum
+		}
+		if !slices.Contains(prop.Required, arg.Name) {
+			schema.Required = append(schema.Required, arg.Name)
+		}
+	}
+
+	return schema, nil
 }
 
 func capitalize(s string) string {
