@@ -29,7 +29,7 @@ func main() {
 	}
 	server.AddTools(tools...)
 
-	if err := startConfigWatcher(ctx, "tools.yaml", server); err != nil {
+	if err := startConfigWatcher(ctx, "tools.yaml", server, tools); err != nil {
 		log.Fatalf("failed to watch config: %v", err)
 	}
 
@@ -83,7 +83,7 @@ func buildServerTools(cfg *config.Config) ([]*mcp.ServerTool, error) {
 	return tools, nil
 }
 
-func startConfigWatcher(ctx context.Context, path string, server *mcp.Server) error {
+func startConfigWatcher(ctx context.Context, path string, server *mcp.Server, initial []*mcp.ServerTool) error {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -93,8 +93,32 @@ func startConfigWatcher(ctx context.Context, path string, server *mcp.Server) er
 	}
 
 	var mu sync.Mutex
-	var current *config.Config
-	current, _ = config.Load(path)
+	current := append([]*mcp.ServerTool(nil), initial...)
+
+	reload := func() {
+		cfg, err := config.Load(path)
+		if err != nil {
+			log.Printf("failed to reload config: %v", err)
+			return
+		}
+		tools, err := buildServerTools(cfg)
+		if err != nil {
+			log.Printf("failed to build tools: %v", err)
+			return
+		}
+		mu.Lock()
+		if len(current) > 0 {
+			names := make([]string, len(current))
+			for i, t := range current {
+				names[i] = t.Tool.Name
+			}
+			server.RemoveTools(names...)
+		}
+		server.AddTools(tools...)
+		current = tools
+		mu.Unlock()
+		log.Printf("reloaded tools from %s", path)
+	}
 
 	go func() {
 		defer watcher.Close()
@@ -107,29 +131,7 @@ func startConfigWatcher(ctx context.Context, path string, server *mcp.Server) er
 					return
 				}
 				if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) != 0 {
-					cfg, err := config.Load(path)
-					if err != nil {
-						log.Printf("failed to reload config: %v", err)
-						continue
-					}
-					mu.Lock()
-					if current != nil {
-						names := make([]string, len(current.Tools))
-						for i, t := range current.Tools {
-							names[i] = t.Namespace + "/" + t.Name
-						}
-						server.RemoveTools(names...)
-					}
-					tools, err := buildServerTools(cfg)
-					if err != nil {
-						mu.Unlock()
-						log.Printf("failed to create tools: %v", err)
-						continue
-					}
-					server.AddTools(tools...)
-					current = cfg
-					mu.Unlock()
-					log.Printf("reloaded tools from %s", path)
+					reload()
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
