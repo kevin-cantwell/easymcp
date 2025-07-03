@@ -10,11 +10,26 @@ import (
 	"unicode"
 
 	"github.com/modelcontextprotocol/go-sdk/jsonschema"
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
-// ToolArg defines a single argument for a tool
-type ToolArg struct {
+// Config wraps a list of tools
+type Config struct {
+	Tools []Tool `yaml:"tools"`
+}
+
+// Tool defines a namespaced command
+type Tool struct {
+	Namespace   string  `yaml:"namespace"` // Namespace for the tool, e.g. "demo" or "util"
+	Name        string  `yaml:"name"`
+	Description string  `yaml:"description"`
+	Run         Command `yaml:"run"` // Optional command to run
+	Input       []Input `yaml:"input"`
+	Output      Output  `yaml:"output"`
+}
+
+// Input defines a single argument for a tool
+type Input struct {
 	Name        string `yaml:"name"`
 	Type        string `yaml:"type"` // JSON schema type (One of: "string", "integer", "number", "boolean")
 	Description string `yaml:"description"`
@@ -22,24 +37,18 @@ type ToolArg struct {
 	Required    bool   `yaml:"required"`
 }
 
+type Output struct {
+	Format string `yaml:"format"` // Output format (One of: "text", "json")
+}
+
 type Command struct {
 	Cmd  string   `yaml:"cmd"`  // Command to run
 	Args []string `yaml:"args"` // Arguments to the command
 }
 
-// Tool defines a namespaced command
-type Tool struct {
-	Namespace    string    `yaml:"namespace"`
-	Name         string    `yaml:"name"`
-	Description  string    `yaml:"description"`
-	Args         []ToolArg `yaml:"args"`
-	Run          Command   `yaml:"run"` // Optional command to run
-	OutputFormat string    `yaml:"output_format"`
-}
-
 func (t *Tool) InputSchema() (*jsonschema.Schema, error) {
-	fields := make([]reflect.StructField, len(t.Args))
-	for i, arg := range t.Args {
+	fields := make([]reflect.StructField, len(t.Input))
+	for i, arg := range t.Input {
 		name := arg.Name
 		if name == "" {
 			return nil, errors.New("argument name cannot be empty")
@@ -102,7 +111,7 @@ func (t *Tool) InputSchema() (*jsonschema.Schema, error) {
 	}
 
 	// Update properties schema based on tool arguments
-	for _, arg := range t.Args {
+	for _, arg := range t.Input {
 		prop := schema.Properties[arg.Name]
 		if prop == nil {
 			return nil, fmt.Errorf("missing schema property for argument: %s", arg.Name)
@@ -126,11 +135,6 @@ func capitalize(s string) string {
 	runes := []rune(s)
 	runes[0] = unicode.ToUpper(runes[0])
 	return string(runes)
-}
-
-// Config wraps a list of tools
-type Config struct {
-	Tools []Tool `yaml:"tools"`
 }
 
 // Load reads and parses the YAML config file
