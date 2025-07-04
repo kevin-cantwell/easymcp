@@ -27,7 +27,7 @@ tools:
     run:
       cmd: cat
       args:
-        - /Users/kcantwell/Downloads/sad_coffee.png
+        - _examples/sad_coffee.png
     output:
       format: image
 
