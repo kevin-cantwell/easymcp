@@ -18,7 +18,7 @@ tools:
       cmd: jq
       args:
         - .
-        - jq.json
+        - _examples/jq.json
     output:
       format: text
   - namespace: files
