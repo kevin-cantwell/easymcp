@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"log"
 	"os/exec"
 
@@ -11,18 +13,30 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+const version = "v0.0.1"
+
 func main() {
+	cfgPath := flag.String("config", "tools.yaml", "path to tool configuration")
+	srvName := flag.String("name", "easymcp", "MCP server name")
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Load tool definitions from YAML
-	cfg, err := config.Load("tools.yaml")
+	cfg, err := config.Load(*cfgPath)
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
 	// Create a server with a single tool.
-	server := mcp.NewServer("easymcp", "v0.0.1", nil)
+	server := mcp.NewServer(*srvName, version, nil)
 	serverTools := []*mcp.ServerTool{}
 
 	// Register each tool from config
