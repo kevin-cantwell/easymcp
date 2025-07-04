@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"flag"
+	"fmt"
 	"log"
+	"os"
 	"os/exec"
 
 	"github.com/example/easymcp/internal/config"
@@ -11,18 +14,32 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+const version = "v0.0.1"
+
 func main() {
+	log.SetOutput(os.Stdout)
+
+	cfgPath := flag.String("config", "tools.yaml", "path to tool configuration")
+	srvName := flag.String("name", "easymcp", "MCP server name")
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("EasyMCP " + version)
+		return
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Load tool definitions from YAML
-	cfg, err := config.Load("tools.yaml")
+	cfg, err := config.Load(*cfgPath)
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
 	// Create a server with a single tool.
-	server := mcp.NewServer("easymcp", "v0.0.1", nil)
+	server := mcp.NewServer(*srvName, version, nil)
 	serverTools := []*mcp.ServerTool{}
 
 	// Register each tool from config
@@ -45,13 +62,19 @@ func main() {
 				var result mcp.CallToolResult
 				out, err := executor.RunCommand(ctx, t.Run.Cmd, t.Run.Args, params.Arguments)
 				if err != nil {
+					log.Printf("Error running command %s %v %v: %v\n", t.Run.Cmd, t.Run.Args, params.Arguments, err)
+					result.IsError = true
 					switch err.(type) {
 					case *exec.ExitError:
-						result.IsError = true
+						result.Content = []mcp.Content{&mcp.TextContent{Text: string(out)}}
 					default:
-						return nil, err
+						result.Content = []mcp.Content{&mcp.TextContent{
+							Text: fmt.Sprintf("tool error: failed to run command: %s", t.Run.Cmd),
+						}}
 					}
+					return &result, nil
 				}
+
 				switch t.Output.Format {
 				case "audio":
 					mime := mimetype.Detect(out)
