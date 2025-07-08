@@ -43,6 +43,8 @@ tools:
       # The command to run, which must be available in the server's environment
       cmd: echo
       args:
+        # Arguments can be simple strings or templates that use the input values
+        # The template syntax is Go's text/template, so you can use {{.message}} to access the input parameter of the same name
         - "{{.message}}"
     input:
       - name: message
