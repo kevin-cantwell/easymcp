@@ -35,18 +35,28 @@ Create a YAML file describing your tools, for example:
 
 ```yaml
 tools:
+  # Namespaces result in tool names like "utils/echo"
   - namespace: utils
     name: echo
     description: Echo a message
     run:
+      # The command to run, which must be available in the server's environment
       cmd: echo
       args:
         - "{{.message}}"
     input:
       - name: message
+        # Type values are a subset of JSON Schema types: string, number, integer, or boolean
         type: string
         description: message to echo
         required: true
+        # If provided, the input will be limited to these values
+        enum:
+          - "foo"
+          - "bar"
+    output:
+      # The output format can be audio, image, or text. Text is used if unspecified.
+      format: text
 ```
 
 Start the MCP server using that file:

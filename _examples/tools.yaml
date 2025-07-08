@@ -30,4 +30,18 @@ tools:
         - _examples/sad_coffee.png
     output:
       format: image
+  - namespace: enums
+    name: rev
+    description: Reverses the enum provided
+    input:
+      - name: fooer
+        type: string
+        enum:
+          - foo
+          - bar
+          - baz
+    run:
+      cmd: rev
+      args:
+        - "_examples/{{.fooer}}.txt"
 
