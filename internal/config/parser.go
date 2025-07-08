@@ -120,8 +120,16 @@ func (t *Tool) InputSchema() (*jsonschema.Schema, error) {
 		if len(arg.Enum) > 0 {
 			prop.Enum = arg.Enum
 		}
-		if !slices.Contains(prop.Required, arg.Name) {
-			schema.Required = append(schema.Required, arg.Name)
+		if arg.Required {
+			if !slices.Contains(schema.Required, arg.Name) {
+				schema.Required = append(schema.Required, arg.Name)
+			}
+		} else {
+			if slices.Contains(schema.Required, arg.Name) {
+				schema.Required = slices.DeleteFunc(schema.Required, func(s string) bool {
+					return s == arg.Name
+				})
+			}
 		}
 	}
 
