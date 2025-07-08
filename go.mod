@@ -1,4 +1,4 @@
-module github.com/example/easymcp
+module github.com/kevin-cantwell/easymcp
 
 go 1.24.3
 

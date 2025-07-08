@@ -7,8 +7,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/example/easymcp/internal/config"
-	"github.com/example/easymcp/internal/server"
+	"github.com/kevin-cantwell/easymcp/internal/config"
+	"github.com/kevin-cantwell/easymcp/internal/server"
 )
 
 const version = "v0.0.1"

@@ -9,8 +9,8 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/example/easymcp/internal/config"
-	"github.com/example/easymcp/internal/executor"
+	"github.com/kevin-cantwell/easymcp/internal/config"
+	"github.com/kevin-cantwell/easymcp/internal/executor"
 )
 
 type Server struct {

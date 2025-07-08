@@ -24,7 +24,7 @@ If you need a production-ready solution you should look at a hardened MCP server
 You need a working Go installation. Then run:
 
 ```bash
-go install github.com/example/easymcp/cmd/easymcp@latest
+go install github.com/kevin-cantwell/easymcp/cmd/easymcp@latest
 ```
 
 This installs the `easymcp` binary into your `$GOBIN` directory.

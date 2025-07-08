@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/example/easymcp/internal/config"
+	"github.com/kevin-cantwell/easymcp/internal/config"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
