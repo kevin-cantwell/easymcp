@@ -53,25 +53,37 @@ func New(cfg *config.Config, name, version, addr string) (*Server, error) {
 		tt := t
 		r.Post(path, func(w http.ResponseWriter, req *http.Request) {
 			var args map[string]any
-			if err := json.NewDecoder(req.Body).Decode(&args); err != nil {
-				http.Error(w, "invalid json", http.StatusBadRequest)
-				return
+			if len(tt.Input) > 0 {
+				if err := json.NewDecoder(req.Body).Decode(&args); err != nil {
+					http.Error(w, "invalid json", http.StatusBadRequest)
+					return
+				}
 			}
 			out, err := executor.RunCommand(req.Context(), tt.Run.Cmd, tt.Run.Args, args)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			w.Header().Set("Content-Type", "application/json")
-			if tt.Output.Format == "json" {
-				// return raw json if possible
+			switch tt.Output.Format {
+			case "json":
+				w.Header().Set("Content-Type", "application/json")
 				if json.Valid(out) {
 					w.Write(out)
 					return
 				}
+			case "image":
+				w.Header().Set("Content-Type", "image/png")
+				w.Write(out)
+				return
+			case "audio":
+				w.Header().Set("Content-Type", "audio/mpeg")
+				w.Write(out)
+				return
+			default:
+				w.Header().Set("Content-Type", "text/plain")
+				w.Write(out)
+				return
 			}
-			// default text response
-			json.NewEncoder(w).Encode(map[string]string{"result": string(out)})
 		})
 
 		// Add path spec
@@ -80,11 +92,25 @@ func New(cfg *config.Config, name, version, addr string) (*Server, error) {
 			OperationID: tt.Namespace + "_" + tt.Name,
 			Summary:     tt.Name,
 			Description: tt.Description,
-			RequestBody: &openapi3.RequestBodyRef{Value: &openapi3.RequestBody{Required: true, Content: openapi3.Content{"application/json": &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: &reqSchema}}}}},
-			Responses: openapi3.Responses{
-				"200": &openapi3.ResponseRef{Value: &openapi3.Response{Description: &okDesc, Content: openapi3.Content{"application/json": &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}}}},
-			},
+			Responses:   openapi3.Responses{},
 		}
+
+		if len(tt.Input) > 0 {
+			op.RequestBody = &openapi3.RequestBodyRef{Value: &openapi3.RequestBody{Required: true, Content: openapi3.Content{"application/json": &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: &reqSchema}}}}}
+		}
+
+		respContent := openapi3.Content{}
+		switch tt.Output.Format {
+		case "json":
+			respContent["application/json"] = &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: openapi3.NewObjectSchema()}}
+		case "image":
+			respContent["image/png"] = &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: openapi3.NewBytesSchema()}}
+		case "audio":
+			respContent["audio/mpeg"] = &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: openapi3.NewBytesSchema()}}
+		default:
+			respContent["text/plain"] = &openapi3.MediaType{Schema: &openapi3.SchemaRef{Value: openapi3.NewStringSchema()}}
+		}
+		op.Responses["200"] = &openapi3.ResponseRef{Value: &openapi3.Response{Description: &okDesc, Content: respContent}}
 		if spec.Paths[path] == nil {
 			spec.Paths[path] = &openapi3.PathItem{}
 		}
