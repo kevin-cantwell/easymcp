@@ -57,13 +57,13 @@ easymcp --config tools.yaml
 
 The server communicates over stdio and can be embedded or proxied by another tool. One option is [`mcpo`](https://github.com/open-webui/mcpo), which exposes an MCP server as an OpenAPI HTTP service. Running `mcpo` alongside `easymcp` lets you generate ready‑to‑use tools for chat LLM products such as [Open WebUI](https://github.com/open-webui/open-webui) in just a few commands.
 
-You can also serve the tools directly over HTTP by providing the `--port` flag:
+You can also expose the same tools over HTTP by providing the `--port` flag. The HTTP server proxies requests to the MCP server running on stdio:
 
 ```bash
 easymcp --config tools.yaml --port 8080
 ```
 
-This starts a basic OpenAPI server. Each tool is exposed at `/namespace/name` and the full specification is available at `/openapi.json`.
+This starts a basic OpenAPI server that forwards calls to the MCP server. Each tool is exposed at `/namespace/name` and the full specification is available at `/openapi.json`.
 
 ## License
 
